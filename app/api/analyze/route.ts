@@ -68,14 +68,19 @@ If the photo is not a plant, too unclear, or no visible concern can be identifie
 
   try {
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
         signal: AbortSignal.timeout(30_000),
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: photo.type, data: imageData } }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+            maxOutputTokens: 600,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       },
     );
