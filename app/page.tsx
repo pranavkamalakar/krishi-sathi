@@ -32,17 +32,35 @@ export default function Home() {
   const [selectedIssue, setSelectedIssue] = useState("default");
   const [selectedCrop, setSelectedCrop] = useState(crops[0]);
   const [showResult, setShowResult] = useState(false);
-  const result = useMemo(() => issues[selectedIssue], [selectedIssue]);
+  const [aiResult, setAiResult] = useState<Issue | null>(null);
+  const [isAnalysing, setIsAnalysing] = useState(false);
+  const [analysisError, setAnalysisError] = useState("");
+  const result = useMemo(() => aiResult ?? issues[selectedIssue], [aiResult, selectedIssue]);
 
-  function uploadPhoto(event: ChangeEvent<HTMLInputElement>) {
+  async function uploadPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
     setPreview(URL.createObjectURL(file));
     setShowResult(true);
+    setAiResult(null);
+    setAnalysisError("");
+    setIsAnalysing(true);
+    const formData = new FormData();
+    formData.append("photo", file);
+    try {
+      const response = await fetch("/api/analyze", { method: "POST", body: formData });
+      const data = (await response.json()) as { guidance?: Issue; error?: string };
+      if (!response.ok || !data.guidance) throw new Error(data.error ?? "Could not analyse this image.");
+      setAiResult(data.guidance);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Could not analyse this image.");
+    } finally {
+      setIsAnalysing(false);
+    }
   }
 
-  function analyse(symptom: string) { setSelectedIssue(symptom); setShowResult(true); }
+  function analyse(symptom: string) { setSelectedIssue(symptom); setAiResult(null); setAnalysisError(""); setShowResult(true); }
 
   return (
     <main>
@@ -52,7 +70,7 @@ export default function Home() {
         <div className="heroVisual"><div className="sun"/><div className="hill hillBack"/><div className="hill hillFront"/><div className="plant"><span className="leaf leafA">◒</span><span className="leaf leafB">◒</span><span className="stem"/><span className="pot">▰</span></div><div className="floatCard cardOne">🍃 <b>Crop check</b><small>Easy next steps</small></div><div className="floatCard cardTwo">♻️ <b>Soil friendly</b><small>Organic basics</small></div></div>
       </section>
       <section className="steps"><p className="eyebrow">How it works</p><div className="stepGrid"><article><span className="number">01</span><h3>Share a photo</h3><p>Take a clear picture in daylight.</p></article><article><span className="number">02</span><h3>Choose symptoms</h3><p>Tell us what you can see on the crop.</p></article><article><span className="number">03</span><h3>Take the next step</h3><p>Use simple care and soil guidance.</p></article></div></section>
-      <section className="diagnose section" id="diagnose"><div className="sectionTitle"><p className="eyebrow">Crop check</p><h2>What does your plant need?</h2><p>Start with a photo. Then pick the symptom that looks closest. This is first-aid guidance, not a lab diagnosis.</p></div><div className="diagnosisGrid"><div className="uploadPanel"><label className="dropzone" htmlFor="photo">{preview ? <img src={preview} alt="Uploaded plant preview"/> : <><span className="uploadIcon">↑</span><b>Upload a crop photo</b><small>JPG, PNG, or WEBP · daylight photos work best</small></>}<input id="photo" type="file" accept="image/*" onChange={uploadPhoto}/></label>{fileName && <p className="fileName">✓ {fileName}</p>}<p className="symptomLabel">Or choose what you notice</p><div className="symptoms"><button className={selectedIssue === "yellow" ? "active" : ""} onClick={() => analyse("yellow")}>🟡 Yellow leaves</button><button className={selectedIssue === "spots" ? "active" : ""} onClick={() => analyse("spots")}>🟤 Leaf spots</button><button className={selectedIssue === "pest" ? "active" : ""} onClick={() => analyse("pest")}>🐛 Chewed or curled</button></div></div><aside className="resultPanel">{showResult ? <><p className="resultTag">Guidance</p><h3>{result.title}</h3><p className="confidence">{result.confidence}</p><p>{result.cause}</p><ol>{result.actions.map((action) => <li key={action}>{action}</li>)}</ol><p className="caution"><b>Important:</b> {result.caution}</p></> : <div className="empty"><span>⌁</span><h3>Your guidance will appear here</h3><p>Upload a photo or select a symptom to begin.</p></div>}</aside></div></section>
+      <section className="diagnose section" id="diagnose"><div className="sectionTitle"><p className="eyebrow">Crop check</p><h2>What does your plant need?</h2><p>Upload a clear crop photo for AI-assisted first-aid guidance, or pick the symptom that looks closest. This is not a lab diagnosis.</p></div><div className="diagnosisGrid"><div className="uploadPanel"><label className="dropzone" htmlFor="photo">{preview ? <img src={preview} alt="Uploaded plant preview"/> : <><span className="uploadIcon">↑</span><b>Upload a crop photo</b><small>JPG, PNG, or WEBP · daylight photos work best</small></>}<input id="photo" type="file" accept="image/*" onChange={uploadPhoto}/></label>{fileName && <p className="fileName">✓ {fileName} {isAnalysing && "· Analysing image…"}</p>}<p className="symptomLabel">Or choose what you notice</p><div className="symptoms"><button className={selectedIssue === "yellow" ? "active" : ""} onClick={() => analyse("yellow")}>🟡 Yellow leaves</button><button className={selectedIssue === "spots" ? "active" : ""} onClick={() => analyse("spots")}>🟤 Leaf spots</button><button className={selectedIssue === "pest" ? "active" : ""} onClick={() => analyse("pest")}>🐛 Chewed or curled</button></div></div><aside className="resultPanel">{isAnalysing ? <div className="empty"><span>⌁</span><h3>Reviewing your crop photo…</h3><p>This usually takes a few seconds.</p></div> : showResult ? <><p className="resultTag">{aiResult ? "AI image review · verify locally" : "Manual guidance"}</p><h3>{result.title}</h3><p className="confidence">{result.confidence}</p><p>{result.cause}</p><ol>{result.actions.map((action) => <li key={action}>{action}</li>)}</ol>{analysisError && <p className="analysisError">{analysisError}</p>}<p className="caution"><b>Important:</b> {result.caution}</p></> : <div className="empty"><span>⌁</span><h3>Your guidance will appear here</h3><p>Upload a photo or select a symptom to begin.</p></div>}</aside></div></section>
       <section className="soil section" id="soil"><div className="sectionTitle"><p className="eyebrow">Soil care</p><h2>Protect the soil. Support the crop.</h2><p>Start with these low-cost practices before depending on excess chemical fertilizer.</p></div><div className="soilGrid"><article><div className="soilIcon">♻</div><h3>Use mature compost</h3><p>Mix fully decomposed kitchen or farm compost into topsoil. It improves structure and helps soil hold moisture.</p><span>Best practice: apply in a thin layer</span></article><article><div className="soilIcon">◌</div><h3>Keep soil covered</h3><p>Use dry leaves, straw, or crop residue as mulch. It reduces heat, slows evaporation, and limits weeds.</p><span>Best practice: keep mulch away from the stem</span></article><article><div className="soilIcon">⌁</div><h3>Test before treating</h3><p>Check soil pH and nutrient status through a local soil-testing centre before buying major fertilizer inputs.</p><span>Best practice: keep a simple field record</span></article></div></section>
       <section className="cropGuide section" id="crops"><div className="sectionTitle"><p className="eyebrow">Crop guide</p><h2>Daily care, one crop at a time.</h2></div><div className="cropLayout"><div className="cropTabs">{crops.map((crop) => <button key={crop.name} className={selectedCrop.name === crop.name ? "cropActive" : ""} onClick={() => setSelectedCrop(crop)}><span>{crop.icon}</span>{crop.name}</button>)}</div><article className="cropDetail"><span className="bigCrop">{selectedCrop.icon}</span><div><p className="resultTag">{selectedCrop.name} basics</p><h3>Small checks prevent big problems.</h3><p>{selectedCrop.tip}</p><div className="checklist"><span>✓ Observe leaves twice a week</span><span>✓ Water only when soil needs it</span><span>✓ Keep a note of changes</span></div></div></article></div></section>
       <section className="help"><div><p className="eyebrow">When to ask locally</p><h2>Some crop problems need a field expert.</h2><p>If symptoms spread fast, affect many plants, or return after basic care, show photos and a plant sample to your nearest agriculture office or KVK.</p></div><span className="helpIcon">☏</span></section>
