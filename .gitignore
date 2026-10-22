@@ -3,3 +3,7 @@ node_modules/
 .env*
 !.env.example
 *.log
+.DS_Store
+.build-ppt/
+.build-report/
+tmp/
