@@ -71,9 +71,11 @@ Treat `cleanGuidance` in the API route as a boundary, not cosmetic cleanup. It c
 The crop checker has distinct states that must stay truthful:
 
 ```text
-idle
-  └─ image selected → analysing → AI success
-                                └→ AI failure → manual symptom option
+idle ──(drag-drop | upload | camera capture)──> analysing ─→ AI success
+                                                         └─→ AI failure → manual symptom option
+
+idle ──> camera live ──(capture)──> analysing
+     └─> camera unavailable → note + device-camera fallback (idle stays usable)
 
 idle/manual symptom → manual guidance
 ```
@@ -84,6 +86,8 @@ Required cues:
 - `AI success`: output labelled `AI image review · verify locally`.
 - `AI failure`: visible `AI unavailable` state and manual fallback route.
 - `manual guidance`: deterministic advice, never presented as an AI response.
+- `camera live`: video preview with capture, flip, and close controls; tracks stopped on capture, close, and unmount.
+- `camera unavailable`: a plain-language reason plus the device-camera file fallback, never a dead end.
 
 Do not replace an AI error with the generic observation card; that was a prior source of confusion.
 

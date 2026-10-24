@@ -45,8 +45,8 @@ next.config.ts               Next.js configuration
 ## Core user flow
 
 1. The user opens the Crop Check section.
-2. They upload one `image/*` file.
-3. The client previews it locally and posts `FormData` field `photo` to `POST /api/analyze`.
+2. They provide one `image/*` photo in any of three ways: drag and drop onto the dropzone, the upload button/file picker, or a live camera capture.
+3. The client previews it locally, downscales it to a longest edge of 1280 px, and posts `FormData` field `photo` to `POST /api/analyze`.
 4. The UI shows the scan overlay and animated loader while the request is in flight.
 5. A successful response renders `AI image review · verify locally` and safe guidance.
 6. A failed request renders `AI unavailable`, with manual symptom buttons still available.
@@ -111,6 +111,18 @@ The old `gemini-flash-latest` alias could use a thinking-capable model and excee
 
 Preserve all layers when editing AI behavior. New agricultural advice must remain safe without knowing the crop, locale, weather, disease severity, regulations, or a field inspection.
 
+## Image capture
+
+`app/page.tsx` owns three capture paths, and all of them end in the same `analysePhoto(file)` call:
+
+- **Drag and drop:** the dropzone handles `dragover`/`dragleave`/`drop` and picks the first `image/*` file. A window-level listener stops the browser from navigating when a file is dropped elsewhere.
+- **Upload:** a hidden `input#photo` opened by the dropzone click, Enter/Space, or the upload button. The input value is cleared after each change so the same file can be re-sent.
+- **Live camera:** `navigator.mediaDevices.getUserMedia` with `facingMode: { ideal: "environment" }`, previewed in a muted `playsInline` `video`, captured to a canvas, and sent as a JPEG. Tracks are stopped after capture and on unmount.
+
+`shrinkImage` downscales anything above 1280 px (or above ~1.6 MB) to a quality-0.85 JPEG before upload, which keeps phone photos inside the 8 MB route limit. If `createImageBitmap` fails, the original file is sent unchanged.
+
+A live camera needs a secure context, so it works on `localhost` and on the HTTPS Vercel deployment but not over a plain-HTTP LAN address. When `getUserMedia` is missing or rejects, the UI explains why and offers a `capture="environment"` file input that opens the device camera app instead. Keep every camera failure non-blocking: drag and drop, upload, and the manual symptom buttons must all stay usable.
+
 ## Manual guidance and crop content
 
 The `issues` object in `app/page.tsx` is the source of truth for deterministic symptom guidance. It covers yellow leaves, leaf spots, pest damage, and an observation default.
@@ -139,6 +151,9 @@ The Crop Check panel must distinguish these states:
 | State | Required visual/result behavior |
 | --- | --- |
 | No upload | Empty guidance prompt |
+| Dragging a file over the dropzone | `dragActive` border plus a visible drop hint |
+| Camera open | Live `video` preview with capture, flip, and close controls |
+| Camera unavailable or blocked | Plain-language `captureNote` plus a device-camera file fallback |
 | Image selected | Local preview and file name |
 | AI running | `photoScan`, animated dots, and “Reading visible leaf patterns…” |
 | AI success | Guidance card with verify-locally label |
@@ -227,8 +242,10 @@ The API route executes server-side. A missing Vercel environment variable is a c
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-## Next.js version rule
+## This is NOT the Next.js you know
 
-This repository uses Next.js 16. Before a Next.js-specific change, read the relevant guide under `node_modules/next/dist/docs/`. Preserve the App Router structure and follow current version-specific guidance rather than relying on older conventions.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
